@@ -1,0 +1,2 @@
+The content within is created solely for educational and illustrative purposes, no effort has been made towards performance optimization or efficiency.
+The primary goal of this repository is to serve as a learning resource, demonstrating various concepts.
