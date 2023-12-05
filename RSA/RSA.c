@@ -1,12 +1,12 @@
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 
 // TODO: Find a way to fix overflow
 
-#define iterations       10
+#define ITERATIONS       10
 #define RAND(start, end) (rand() % ((end) + 1 - (start)) + (start))
 
 uint64_t arith_mod(uint64_t x, uint64_t y) {
@@ -86,7 +86,7 @@ bool millerRabin(uint64_t n) {
         q >>= 1;
         k++;
     }
-    for (size_t i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < ITERATIONS; i++) {
         uint64_t a = RAND(1, n - 1);
         if (isComposite(a, k, q, n)) {
             return false;
@@ -95,45 +95,25 @@ bool millerRabin(uint64_t n) {
     return true;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     uint64_t p, q;
     uint64_t n, phi_n;
 
     uint64_t data, cipher, decrypt;
 
-    while (1) {
-        printf("Enter any two different prime numbers: ");
-        scanf("%llu %llu", &p, &q);
-
-        if (p == q) {
-            printf("Please Enter Different Prime Numbers.");
-        }
-
-        if (!(millerRabin(p) || millerRabin(q))) {
-            printf("Please enter prime numbers only...\n");
-        } else {
-            break;
-        }
-    }
+    p = 7;
+    q = 17;
 
     n = p * q;
 
     phi_n = (p - 1) * (q - 1);
 
-    uint64_t e = 0;
-    uint64_t d = 0;
-    while (1) {
-        // e = RAND(3,50);
-        e = 3;
-        if (extended_gcd(e, phi_n, &d) == 1) {
-            break;
-        }
-    }
+    uint64_t e = 5; // Public key
+    uint64_t d = 0;  // Private key
+    extended_gcd(e, phi_n, &d);
 
-    printf("Value of e: %llu\nValue of d: %llu\n", e, d);
-
-    printf("Enter some numerical data: ");
-    scanf("%llu", &data);
+    data = 6;
 
     cipher = PowMod(data, e, n);
     printf("The cipher text is: %llu\n", cipher);
