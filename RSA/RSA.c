@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+// TODO: Find a way to fix overflow
+
 #define iterations 10
 #define RAND(start,end) (rand() % ((end) + 1 - (start)) + (start))
 
@@ -102,11 +104,12 @@ bool millerRabin(uint64_t n)
 int main(int argc, char* argv[]) 
 {
 	uint64_t p, q;
-	uint64_t n, phin;
+	uint64_t n, phi_n;
 
 	uint64_t data, cipher, decrypt;
 
-	while (1) {
+	while (1) 
+    {
 		printf("Enter any two different prime numbers: ");
 		scanf("%llu %llu", &p, &q);
 
@@ -123,14 +126,15 @@ int main(int argc, char* argv[])
 	
 	n = p * q;
 
-	phin = (p - 1) * (q - 1);
+	phi_n = (p - 1) * (q - 1);
 
 	uint64_t e = 0;
 	uint64_t d = 0;
 	while (1) 
     {
-        e = RAND(3,50);
-		if (extended_gcd(e,phin,&d) == 1){
+        // e = RAND(3,50);
+        e = 3;
+		if (extended_gcd(e,phi_n,&d) == 1){
 			break;
         }
 	}
@@ -144,6 +148,16 @@ int main(int argc, char* argv[])
 	printf("The cipher text is: %llu\n", cipher);
 
 	decrypt = PowMod(cipher, d, n);
+	printf("The decrypted text is: %llu\n", decrypt);
+
+    /*  Using CRT */
+    uint64_t invq;
+    extended_gcd(q, p, &invq);
+
+    uint64_t a1 = PowMod(cipher, d%(p-1), p);
+    uint64_t a2 = PowMod(cipher, d%(q-1), q);
+
+    decrypt = a2 + (invq * (a1-a2) % p)*q;
 	printf("The decrypted text is: %llu\n", decrypt);
     
 	return 0;
