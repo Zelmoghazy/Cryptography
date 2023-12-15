@@ -109,16 +109,16 @@ uint64_t gcd_rec(uint64_t a, uint64_t b)
     return (b==0)?a:gcd_rec(b,a%b);
 }
 
-int extended_gcd(int b, int a, int *inv)
+uint32_t extended_gcd(uint32_t b, uint32_t a, uint32_t *inv)
 {
-    int modulus = a; 
+    uint32_t modulus = a; 
     
     *inv = 0;
-    int t2 = 1;
+    uint32_t t2 = 1;
 
     while (b){
-        int rem = a % b;
-        int t = *inv - t2 * (a/b);
+        uint32_t rem = a % b;
+        uint32_t t = *inv - t2 * (a/b);
         a = b;
         b = rem;
 
@@ -147,7 +147,25 @@ int phi(int n)
 }
 
 
-int main(void)
+// Calculate the Montgomery reduction of a*b (mod q)
+uint32_t montgomery_multiply(uint32_t a, uint32_t b, uint32_t q) 
 {
-    printf("%d\n",phi(209));
+    uint32_t x, lo, hi;
+    uint32_t invq;
+    if(extended_gcd(q,(uint32_t)1<<16, &invq) != 1){
+        exit(EXIT_FAILURE);
+    }
+    x = (uint32_t)a * b;
+
+    // Split 32 bits into hi and lo 16 bits
+    lo = x & 0xFFFF;
+    hi = x >> 16;
+
+    // Take low 16 bits of product and multiply by invq
+    lo = (lo * invq) & 0xFFFF;
+
+    // Take high 16 bits of product
+    x = hi - ((lo * q) >> 16);
+
+    return x;
 }
