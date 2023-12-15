@@ -87,7 +87,7 @@ bool millerRabin(uint64_t n) {
         k++;
     }
     for (size_t i = 0; i < ITERATIONS; i++) {
-        uint64_t a = RAND(1, n - 1);
+        uint64_t a = RAND(2, n - 2);
         if (isComposite(a, k, q, n)) {
             return false;
         }
