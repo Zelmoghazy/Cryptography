@@ -1,7 +1,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #define iterations 10
 
@@ -147,14 +146,23 @@ int phi(int n)
 }
 
 
-// Calculate the Montgomery reduction of a*b (mod q)
-uint32_t montgomery_multiply(uint32_t a, uint32_t b, uint32_t q) 
+/**************************************************************************
+ *   Calculate the Montgomery reduction of a*b (mod q)                    *
+ *   DIV instruction has variable latency depending on the inputs         *
+ *   Thus its subject to "Timing Attacks".                                *
+ *   This can be avoide by using montgomery reduction which uses          *
+ *   two multiplication instead as MUL instruction has fixed latency      *
+ *   on most CPUs                                                         *   
+ **************************************************************************/
+uint32_t montgomery_reduction(uint32_t a, uint32_t b, uint32_t q) 
 {
     uint32_t x, lo, hi;
     uint32_t invq;
+
     if(extended_gcd(q,(uint32_t)1<<16, &invq) != 1){
         exit(EXIT_FAILURE);
     }
+
     x = (uint32_t)a * b;
 
     // Split 32 bits into hi and lo 16 bits
