@@ -147,13 +147,15 @@ int phi(int n)
 
 
 /**************************************************************************
- *   Calculate the Montgomery reduction of a*b (mod q)                    *
+ *   Calculates the Montgomery reduction of a*b (mod q)                   *
+ *   ------------------------------------------------------------         *
  *   DIV instruction has variable latency depending on the inputs         *
  *   Thus its subject to "Timing Attacks".                                *
- *   This can be avoide by using montgomery reduction which uses          *
- *   two multiplication instead as MUL instruction has fixed latency      *
- *   on most CPUs                                                         *   
+ *   This can be avoided by using montgomery reduction which uses         *
+ *   two multiplications instead as MUL instruction                       *
+ *   has fixed latency on most CPUs                                       *                     
  **************************************************************************/
+
 uint32_t montgomery_reduction(uint32_t a, uint32_t b, uint32_t q) 
 {
     uint32_t x, lo, hi;
@@ -176,4 +178,11 @@ uint32_t montgomery_reduction(uint32_t a, uint32_t b, uint32_t q)
     x = hi - ((lo * q) >> 16);
 
     return x;
+}
+
+
+int main(void)
+{
+    printf("%d\n",173584%10);
+
 }
