@@ -32,14 +32,35 @@
         ->(scale down)-> = m
  */
 
-int16_t montgomery_reduce(int32_t a) {
-    int32_t t;
-    int16_t u;
-    u = (int16_t) a * TK_Q_INV;
-    t = (int32_t) u * TK_Q;
-    t = a - t;
-    t >>= 16;
-    return (int16_t) t;
+int PowMod(int a, int n, int b)
+{
+    if (b == 1){
+        return 0;
+    }
+    int result = 1;
+    a = a % b;
+    while (n > 0){
+        if (n % 2 == 1){
+            result = (result * a) % b;
+        }
+        a = (a * a) % b;
+        n = n / 2;
+    }
+    return result;
+}
+
+int montgomery_reduction(int n) 
+{
+    int x, lo, hi;
+    x = n;
+    // Split 32 bits into hi and lo 16 bits
+    lo = x & 0xFFFF;
+    hi = x >> 16;
+    // Take low 16 bits of product and multiply by invq
+    lo = (lo * TK_Q) & 0xFFFF;
+    // Take high 16 bits of product
+    x = hi - ((lo * TK_Q_INV) >> 16);
+    return x;
 }
 
 void print_bin(short msg, short n) {
@@ -62,73 +83,73 @@ static void toy_fill_small(short *buf, int n)
     }
 }
 
-int bitreverse(int x, int n) {
-    int result = 0;
-    for (int i = 0; i < n; i++) {
-        result <<= 1;
-        result |= x & 1;
-        x >>= 1;
+
+void permute_bitreverse(short *src, short *dst, int n) {
+    int lg_2 = log2(n);
+    for (int i = 0; i < n; ++i) {
+        // store the bit-reversed index
+        int rev = 0;
+        //Iterate over each bit position in the original index
+        for (int j = 0; j < lg_2; ++j) {
+            // Extract the j-th bit from the original index 'i'
+            // and set the corresponding bit in 'rev' to its value
+            rev |= ((i >> j) & 1) << (int)(lg_2 - 1 - j);
+        }
+        dst[i] = src[rev];
     }
-    return result;
 }
 
-void permute_bitreverse(int *data, int n) {
-    int *temp = (int *)malloc(n * sizeof(int));
-    for (int i = 0; i < n; i++) {
-        temp[i] = data[bitreverse(i, n)];
-    }
-    for (int i = 0; i < n; i++) {
-        data[i] = temp[i];
-    }
-    free(temp);
-}
-
-void ntt(int *data, int n, int forward, int anti_cyclic) {
-    int lg_n = log2(n);
-
-    permute_bitreverse(data, n);
-
+void ntt(short *data, short n, short forward, short anti_cyclic) {
+    int lg_2 = log2(n);
+    // Declare x vector size n
+    short *x = malloc(n * sizeof(short));
+    permute_bitreverse(data,x, n);
     if (anti_cyclic && forward) {
         int factors[n];
         for (int i = 0; i < n; i++) {
-            factors[i] = (int)pow(TK_SQRT_W, i);
             #if naive_mod
+            factors[i] = PowMod(TK_SQRT_W, i,TK_Q);
             data[i] = (data[i] * factors[i]) % TK_Q;
             #endif
             #if montgomery
-            data[i] = montgomery_reduce(data[i] * factors[i]);
+            int beta_q_power = PowMod(2, 16 * (int)(log2(n) + 1), TK_Q);
+            factors[i] = PowMod(TK_SQRT_W, i,TK_Q);
+            factors[i] *= beta_q_power;
+            data[i] = montgomery_reduction(data[i] * factors[i]);
             #endif
         }
     }
-
-    for (int s = 1; s <= lg_n; s++) {
+    for (int s = 1; s <= lg_2; ++s) {
         int m = 1 << s;
         for (int b = 0; b < n; b += m) {
             int factor = 1;
-            for (int op = 0; op < m / 2; op++) {
-                int a0 = data[b + op];
-                int a1 = (data[b + op + m / 2] * factor);
-                data[b + op] = (a0 + a1) % TK_Q;
-                data[b + op + m / 2] = (a0 - a1 + TK_Q) % TK_Q;
-                factor = (factor * TK_W) % TK_Q;
+            for (int op = 0; op < m / 2; ++op) {
+                int a0 = x[b + op];
+                int a1 = (x[b + op + m / 2] * factor) % TK_Q;
+                x[b + op] = (a0 + a1) % TK_Q;
+                x[b + op + m / 2] = (a0 - a1 + TK_Q) % TK_Q;
+                factor = (factor*TK_W)%TK_Q;
             }
         }
     }
     if (anti_cyclic && !forward) { //correction for m(x)=X^n+1
         int factors[n];
         for (int i = 0; i < n; i++) {
-            factors[i] = (int)pow(TK_SQRT_W, n - 1 - i);
+            factors[i] = PowMod(TK_SQRT_W, n - 1 - i,TK_Q);
             data[i] = (data[i] * factors[i]) % TK_Q;
         }
+    }
+    for (int i = 0; i < n; ++i) {
+        data[i] = x[i];
     }
 }
 
 void toy_polmul_ntt(short *dst, const short *a, const short *b, int add) {
-    int n = 4;
-    int a_ntt[n], b_ntt[n];
+    short n = 4;
+    short a_ntt[n], b_ntt[n];
     for (int i = 0; i < n; i++) {
-        a_ntt[i] = (int)a[i];
-        b_ntt[i] = (int)b[i];
+        a_ntt[i] = (short)a[i];
+        b_ntt[i] = (short)b[i];
     }
 
     ntt(a_ntt, n, 1, 1);
@@ -139,10 +160,6 @@ void toy_polmul_ntt(short *dst, const short *a, const short *b, int add) {
     }
 
     ntt(a_ntt, n, 0, 1);
-
-    for (int i = 0; i < n; i++) {
-        dst[i] = (short)((dst[i] & -add) + a_ntt[i]);
-    }
 }
 
 /* add flag : if true: dst += a*b; if false: dst = a*b; */
@@ -155,10 +172,10 @@ static void toy_polmul_naive(short *dst, const short*a, const short *b, int add)
     dst[3] = ((dst[3]&-add) + a[3]*b[0] + a[2]*b[1]      + a[1]*b[2]      + a[0]*b[3])      % TK_Q;
     #endif
     #if montgomery
-    dst[0] = montgomery_reduce((dst[0]&-add) + a[0]*b[0] + NEG(a[3])*b[1] + NEG(a[2])*b[2] + NEG(a[1])*b[3]);
-    dst[1] = montgomery_reduce((dst[1]&-add) + a[1]*b[0] + a[0]*b[1]      + NEG(a[3])*b[2] + NEG(a[2])*b[3]);
-    dst[2] = montgomery_reduce((dst[2]&-add) + a[2]*b[0] + a[1]*b[1]      + a[0]*b[2]      + NEG(a[3])*b[3]);
-    dst[3] = montgomery_reduce((dst[3]&-add) + a[3]*b[0] + a[2]*b[1]      + a[1]*b[2]      + a[0]*b[3])     ;
+    dst[0] = montgomery_reduction((dst[0]&-add) + a[0]*b[0] + NEG(a[3])*b[1] + NEG(a[2])*b[2] + NEG(a[1])*b[3]);
+    dst[1] = montgomery_reduction((dst[1]&-add) + a[1]*b[0] + a[0]*b[1]      + NEG(a[3])*b[2] + NEG(a[2])*b[3]);
+    dst[2] = montgomery_reduction((dst[2]&-add) + a[2]*b[0] + a[1]*b[1]      + a[0]*b[2]      + NEG(a[3])*b[3]);
+    dst[3] = montgomery_reduction((dst[3]&-add) + a[3]*b[0] + a[2]*b[1]      + a[1]*b[2]      + a[0]*b[3])     ;
     #endif
 }
 
@@ -224,7 +241,7 @@ static void toy_add(short *dst, const short *v1, const short *v2, int count, int
         dst[k] = (v1[k]+val)%TK_Q;
         #endif
         #if montgomery
-        dst[k] = montgomery_reduce(v1[k]+val);
+        dst[k] = montgomery_reduction(v1[k]+val);
         #endif
 
     }
@@ -239,7 +256,7 @@ void toy_gen(short *A, short *t, short *s)
         A[k] = rand()%TK_Q; // Uniformly random
         #endif
         #if montgomery
-        A[k] = montgomery_reduce(rand()); // Uniformly random
+        A[k] = montgomery_reduction(rand()); // Uniformly random
         #endif
     }
     /* Small random errors */
@@ -272,7 +289,7 @@ void toy_enc(const short* A, const short* t, int plain, short* u, short* v){
         v[k]=(v[k]+((TK_Q>>1)&-(plain>>k&1)))%TK_Q;
         #endif
         #if montgomery
-        v[k]=montgomery_reduce(v[k]+((TK_Q>>1)&-(plain>>k&1)));
+        v[k]=montgomery_reduction(v[k]+((TK_Q>>1)&-(plain>>k&1)));
         #endif
     }
 }
@@ -292,7 +309,7 @@ int toy_dec(const short* s, const short* u, const short* v)
             val -= TK_Q;
         }
         printf("%5d ",val);
-        int bit = abs(val) > TK_Q/4;
+        int bit = abs(val)>TK_Q/4;
         plain |= bit << k;
     }
     return plain;
